@@ -1,0 +1,17 @@
+export type Timer = {
+  id: string;
+  name: string;
+  duration: number;
+  startTime?: number;
+  isRunning: boolean;
+  remaining?: number;
+};
+
+export type RoomState = {
+  roomId: string;
+  adminId: string;
+  adminOnline: boolean;
+  clientCount: number;
+  timers: Timer[];
+  currentTimerId: string | null;
+};
