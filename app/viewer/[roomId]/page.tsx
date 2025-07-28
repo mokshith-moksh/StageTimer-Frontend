@@ -4,12 +4,13 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
-
+import { useRouter } from "next/navigation";
 const ViewerPage = () => {
   const [connected, setConnected] = useState(false);
   const [timers, setTimers] = useState<Timer[]>([]);
   const params = useParams();
   const roomId = params.roomId as string;
+  const router = useRouter();
 
   useEffect(() => {
     if (!roomId) return;
@@ -59,6 +60,12 @@ const ViewerPage = () => {
           t.id === timerId ? { ...t, isRunning: false, remaining: 0 } : t
         )
       );
+    });
+    socket.on("error", (error: { message: string }) => {
+      console.error(`❌ Error: ${error.message}`);
+      alert(`Error: ${error.message}`);
+      socket.disconnect();
+      router.push("/");
     });
 
     return () => {

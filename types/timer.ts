@@ -2,7 +2,6 @@ export type Timer = {
   id: string;
   name: string;
   duration: number;
-  startTime?: number;
   isRunning: boolean;
   remaining?: number;
 };

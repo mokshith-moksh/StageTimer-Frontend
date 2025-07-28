@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
+import { formatTime } from "@/utils/formatTime";
 
 const Controller = () => {
   const [connected, setConnected] = useState(false);
   const [timers, setTimers] = useState<Timer[]>([]);
-  const [connectedClients, setConnectedClients] = useState(0);
-
+  const [connectedClients, setConnectedClients] = useState<number | null>(null);
   const params = useParams();
   const roomId = params.roomId as string;
 
@@ -32,7 +32,6 @@ const Controller = () => {
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
-    // 🔁 Room state on join
     socket.on("room-joined", (roomState: RoomState) => {
       setConnectedClients(roomState.clientCount);
       const timersWithRemaining = roomState.timers.map((t) => ({
@@ -42,7 +41,6 @@ const Controller = () => {
       setTimers(timersWithRemaining);
     });
 
-    // ➕ Timer added
     socket.on("timer-added", (newTimer: Timer) => {
       setTimers((prev) => [
         ...prev,
@@ -50,7 +48,6 @@ const Controller = () => {
       ]);
     });
 
-    // ⏱️ Timer tick updates
     socket.on("timerTick", ({ timerId, remaining }) => {
       setTimers((prev) =>
         prev.map((t) =>
@@ -59,7 +56,6 @@ const Controller = () => {
       );
     });
 
-    // ✅ Timer end
     socket.on("timerEnded", ({ timerId }) => {
       console.log(`✅ Timer ${timerId} ended.`);
       setTimers((prev) =>
@@ -73,6 +69,16 @@ const Controller = () => {
       console.log(`▶️ Timer ${timerId} started.`);
     });
 
+    socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
+      console.log(`Room state updated: ${JSON.stringify(roomState)}`);
+      console.log("Connected clients:", roomState.clientCount);
+      setConnectedClients(roomState.clientCount);
+    });
+    socket.on("error", (error: { message: string }) => {
+      console.error(`❌ Error: ${error.message}`);
+      alert(`Error: ${error.message}`);
+    });
+
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
@@ -81,6 +87,7 @@ const Controller = () => {
       socket.off("timerTick");
       socket.off("timerEnded");
       socket.off("timer-started");
+      socket.off("roomState");
       socket.disconnect();
     };
   }, [roomId]);
@@ -92,7 +99,6 @@ const Controller = () => {
       duration: 600,
       name: "New Round Timer",
     });
-    console.log(`Timer added to room ${roomId}`);
   };
 
   const handleStartTimer = (timerId: string) => {
@@ -108,7 +114,6 @@ const Controller = () => {
       <p className="mt-4">
         Status: {connected ? "✅ Connected" : "❌ Disconnected"}
       </p>
-
       <p className="mt-2 text-gray-800">Share this with Clients:</p>
       <p className="font-mono text-blue-600 underline">
         http://localhost:3000/viewer/{roomId}
@@ -126,38 +131,38 @@ const Controller = () => {
       </button>
 
       <div className="mt-6 space-y-4">
-        {timers.map((timer) => (
-          <div
-            key={timer.id}
-            className="bg-white p-4 rounded shadow-md w-full max-w-sm"
-          >
-            <p className="text-lg font-bold">{timer.name}</p>
-            <p>Duration: {timer.duration}s</p>
-            <p>
-              Remaining:{" "}
-              <span className="font-mono text-xl">
-                {timer.remaining !== undefined
-                  ? timer.remaining
-                  : timer.duration}
-                s
-              </span>
-            </p>
-            <p>
-              Status:{" "}
-              <span
-                className={timer.isRunning ? "text-green-600" : "text-gray-600"}
-              >
-                {timer.isRunning ? "Running ⏱️" : "Stopped ⏹️"}
-              </span>
-            </p>
-            <button
-              onClick={() => handleStartTimer(timer.id)}
-              className="mt-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+        {timers.map((timer) => {
+          const formatted = formatTime(timer.remaining ?? timer.duration);
+          return (
+            <div
+              key={timer.id}
+              className="bg-white p-4 rounded shadow-md w-full max-w-sm"
             >
-              ▶️ Start Timer
-            </button>
-          </div>
-        ))}
+              <p className="text-lg font-bold">{timer.name}</p>
+              <p>Duration: {formatTime(timer.duration)}</p>
+              <p>
+                Remaining:{" "}
+                <span className="font-mono text-xl">{formatted}</span>
+              </p>
+              <p>
+                Status:{" "}
+                <span
+                  className={
+                    timer.isRunning ? "text-green-600" : "text-gray-600"
+                  }
+                >
+                  {timer.isRunning ? "Running ⏱️" : "Stopped ⏹️"}
+                </span>
+              </p>
+              <button
+                onClick={() => handleStartTimer(timer.id)}
+                className="mt-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+              >
+                ▶️ Start Timer
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
