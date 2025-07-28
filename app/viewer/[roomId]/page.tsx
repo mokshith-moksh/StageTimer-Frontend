@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
-import { useRouter } from "next/navigation";
+import { formatTime } from "@/utils/formatTime";
+
 const ViewerPage = () => {
   const [connected, setConnected] = useState(false);
   const [timers, setTimers] = useState<Timer[]>([]);
@@ -27,23 +28,19 @@ const ViewerPage = () => {
     };
 
     socket.connect();
-
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
     socket.on("room-joined", (roomState: RoomState) => {
-      const timersWithRemaining = roomState.timers.map((t) => ({
-        ...t,
-        remaining: t.duration,
-      }));
-      setTimers(timersWithRemaining);
+      setTimers(roomState.timers);
+    });
+
+    socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
+      setTimers(roomState.timers);
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
-      setTimers((prev) => [
-        ...prev,
-        { ...newTimer, remaining: newTimer.duration },
-      ]);
+      setTimers((prev) => [...prev, newTimer]);
     });
 
     socket.on("timerTick", ({ timerId, remaining }) => {
@@ -61,6 +58,37 @@ const ViewerPage = () => {
         )
       );
     });
+
+    socket.on("timer-paused", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) => (t.id === timerId ? { ...t, isRunning: false } : t))
+      );
+    });
+
+    socket.on("timer-reset", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) =>
+          t.id === timerId
+            ? { ...t, remaining: t.duration, isRunning: false }
+            : t
+        )
+      );
+    });
+
+    socket.on("timer-restarted", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) =>
+          t.id === timerId
+            ? { ...t, remaining: t.duration, isRunning: true }
+            : t
+        )
+      );
+    });
+
+    socket.on("timer-deleted", ({ timerId }) => {
+      setTimers((prev) => prev.filter((t) => t.id !== timerId));
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -71,16 +99,12 @@ const ViewerPage = () => {
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("room-joined");
-      socket.off("timer-added");
-      socket.off("timerTick");
-      socket.off("timerEnded");
       socket.disconnect();
     };
   }, [roomId]);
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-slate-200 text-black">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-slate-100 text-black">
       <p className="text-2xl mb-2 font-semibold">👁️ Viewer Page</p>
       <p className="text-lg">
         Room ID: <span className="font-mono">{roomId}</span>
@@ -97,22 +121,29 @@ const ViewerPage = () => {
             className="bg-white p-4 rounded shadow-md w-full max-w-sm"
           >
             <p className="text-lg font-bold">{timer.name}</p>
-            <p>Duration: {timer.duration}s</p>
+            <p>Duration: {formatTime(timer.duration)}</p>
             <p>
               Remaining:{" "}
               <span className="font-mono text-xl">
-                {timer.remaining !== undefined
-                  ? timer.remaining
-                  : timer.duration}
-                s
+                {formatTime(timer.remaining ?? timer.duration)}
               </span>
             </p>
             <p>
               Status:{" "}
               <span
-                className={timer.isRunning ? "text-green-600" : "text-gray-600"}
+                className={
+                  timer.isRunning
+                    ? "text-green-600"
+                    : timer.remaining === 0
+                    ? "text-red-600"
+                    : "text-gray-600"
+                }
               >
-                {timer.isRunning ? "Running ⏱️" : "Stopped ⏹️"}
+                {timer.isRunning
+                  ? "Running ⏱️"
+                  : timer.remaining === 0
+                  ? "Ended ❌"
+                  : "Paused ⏸️"}
               </span>
             </p>
           </div>

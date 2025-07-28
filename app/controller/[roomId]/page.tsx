@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
@@ -28,24 +28,22 @@ const Controller = () => {
     };
 
     socket.connect();
-
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
+    // Sync full room state
     socket.on("room-joined", (roomState: RoomState) => {
       setConnectedClients(roomState.clientCount);
-      const timersWithRemaining = roomState.timers.map((t) => ({
-        ...t,
-        remaining: t.duration,
-      }));
-      setTimers(timersWithRemaining);
+      setTimers(roomState.timers);
+    });
+
+    socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
+      setConnectedClients(roomState.clientCount);
+      setTimers(roomState.timers);
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
-      setTimers((prev) => [
-        ...prev,
-        { ...newTimer, remaining: newTimer.duration },
-      ]);
+      setTimers((prev) => [...prev, newTimer]);
     });
 
     socket.on("timerTick", ({ timerId, remaining }) => {
@@ -57,7 +55,6 @@ const Controller = () => {
     });
 
     socket.on("timerEnded", ({ timerId }) => {
-      console.log(`✅ Timer ${timerId} ended.`);
       setTimers((prev) =>
         prev.map((t) =>
           t.id === timerId ? { ...t, isRunning: false, remaining: 0 } : t
@@ -65,15 +62,36 @@ const Controller = () => {
       );
     });
 
-    socket.on("timer-started", ({ timerId }) => {
-      console.log(`▶️ Timer ${timerId} started.`);
+    socket.on("timer-paused", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) => (t.id === timerId ? { ...t, isRunning: false } : t))
+      );
     });
 
-    socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
-      console.log(`Room state updated: ${JSON.stringify(roomState)}`);
-      console.log("Connected clients:", roomState.clientCount);
-      setConnectedClients(roomState.clientCount);
+    socket.on("timer-reset", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) =>
+          t.id === timerId
+            ? { ...t, remaining: t.duration, isRunning: false }
+            : t
+        )
+      );
     });
+
+    socket.on("timer-restarted", ({ timerId }) => {
+      setTimers((prev) =>
+        prev.map((t) =>
+          t.id === timerId
+            ? { ...t, isRunning: true, remaining: t.duration }
+            : t
+        )
+      );
+    });
+
+    socket.on("timer-deleted", ({ timerId }) => {
+      setTimers((prev) => prev.filter((t) => t.id !== timerId));
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -82,18 +100,12 @@ const Controller = () => {
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("room-joined");
-      socket.off("timer-added");
-      socket.off("timerTick");
-      socket.off("timerEnded");
-      socket.off("timer-started");
-      socket.off("roomState");
       socket.disconnect();
     };
   }, [roomId]);
 
+  // === Button Handlers ===
   const handleAddTimer = () => {
-    if (!roomId) return;
     socket.emit("add-timer", {
       roomId,
       duration: 600,
@@ -103,6 +115,22 @@ const Controller = () => {
 
   const handleStartTimer = (timerId: string) => {
     socket.emit("start-timer", { roomId, timerId });
+  };
+
+  const handlePauseTimer = (timerId: string) => {
+    socket.emit("pause-timer", { roomId, timerId });
+  };
+
+  const handleResetTimer = (timerId: string) => {
+    socket.emit("reset-timer", { roomId, timerId });
+  };
+
+  const handleRestartTimer = (timerId: string) => {
+    socket.emit("restart-timer", { roomId, timerId });
+  };
+
+  const handleDeleteTimer = (timerId: string) => {
+    socket.emit("delete-timer", { roomId, timerId });
   };
 
   return (
@@ -151,15 +179,42 @@ const Controller = () => {
                     timer.isRunning ? "text-green-600" : "text-gray-600"
                   }
                 >
-                  {timer.isRunning ? "Running ⏱️" : "Stopped ⏹️"}
+                  {timer.isRunning ? "Running ⏱️" : "Paused ⏸️"}
                 </span>
               </p>
-              <button
-                onClick={() => handleStartTimer(timer.id)}
-                className="mt-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
-              >
-                ▶️ Start Timer
-              </button>
+
+              <div className="mt-2 space-x-2">
+                <button
+                  onClick={() => handleStartTimer(timer.id)}
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+                >
+                  ▶️ Start
+                </button>
+                <button
+                  onClick={() => handlePauseTimer(timer.id)}
+                  className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition"
+                >
+                  ⏸️ Pause
+                </button>
+                <button
+                  onClick={() => handleResetTimer(timer.id)}
+                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition"
+                >
+                  🔄 Reset
+                </button>
+                <button
+                  onClick={() => handleRestartTimer(timer.id)}
+                  className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 transition"
+                >
+                  🔁 Restart
+                </button>
+                <button
+                  onClick={() => handleDeleteTimer(timer.id)}
+                  className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-800 transition"
+                >
+                  ❌ Delete
+                </button>
+              </div>
             </div>
           );
         })}
