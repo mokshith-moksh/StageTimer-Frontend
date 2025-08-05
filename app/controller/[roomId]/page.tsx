@@ -5,6 +5,18 @@ import { useParams } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
+import Timeline from "@/components/TimeLineProvider";
+
+// Helper: Deduplicate by `id`
+const deduplicateTimers = (timers: Timer[]): Timer[] => {
+  const map = new Map<string, Timer>();
+  timers.forEach((t) => {
+    if (!map.has(t.id)) {
+      map.set(t.id, t);
+    }
+  });
+  return Array.from(map.values());
+};
 
 const Controller = () => {
   const [connected, setConnected] = useState(false);
@@ -31,19 +43,20 @@ const Controller = () => {
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
-    // Sync full room state
     socket.on("room-joined", (roomState: RoomState) => {
       setConnectedClients(roomState.clientCount);
-      setTimers(roomState.timers);
+      setTimers(deduplicateTimers(roomState.timers));
     });
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
       setConnectedClients(roomState.clientCount);
-      setTimers(roomState.timers);
+      setTimers(deduplicateTimers(roomState.timers));
+      console.log(`Room state updated: ${roomState.roomId}`);
+      console.log(`Connected clients: ${roomState.clientCount}`);
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
-      setTimers((prev) => [...prev, newTimer]);
+      setTimers((prev) => deduplicateTimers([...prev, newTimer]));
     });
 
     socket.on("timerTick", ({ timerId, remaining }) => {
@@ -92,6 +105,12 @@ const Controller = () => {
       setTimers((prev) => prev.filter((t) => t.id !== timerId));
     });
 
+    socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
+      setTimers((prev) =>
+        prev.map((t) => (t.id === timerId ? { ...t, remaining } : t))
+      );
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -100,9 +119,10 @@ const Controller = () => {
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("timer-time-updated");
       socket.disconnect();
     };
-  }, [roomId]);
+  }, []);
 
   // === Button Handlers ===
   const handleAddTimer = () => {
@@ -131,6 +151,14 @@ const Controller = () => {
 
   const handleDeleteTimer = (timerId: string) => {
     socket.emit("delete-timer", { roomId, timerId });
+  };
+
+  const handleTimeChange = (timerId: string, newTime: number) => {
+    socket.emit("setTimerTime", {
+      roomId,
+      timerId,
+      newTime,
+    });
   };
 
   return (
@@ -214,6 +242,18 @@ const Controller = () => {
                 >
                   ❌ Delete
                 </button>
+              </div>
+              <div>
+                <Timeline
+                  roomId={roomId}
+                  timerId={timer.id}
+                  duration={timer.duration}
+                  currentTime={timer.remaining ?? timer.duration}
+                  markers={timer.markers || []}
+                  onTimeChange={(newTime) =>
+                    handleTimeChange(timer.id, newTime)
+                  }
+                />
               </div>
             </div>
           );

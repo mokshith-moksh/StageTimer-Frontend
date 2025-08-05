@@ -15,6 +15,15 @@ const ViewerPage = () => {
 
   useEffect(() => {
     if (!roomId) return;
+    const deduplicateTimers = (timers: Timer[]): Timer[] => {
+      const map = new Map<string, Timer>();
+      timers.forEach((t) => {
+        if (!map.has(t.id)) {
+          map.set(t.id, t);
+        }
+      });
+      return Array.from(map.values());
+    };
 
     const onConnect = () => {
       setConnected(true);
@@ -32,15 +41,15 @@ const ViewerPage = () => {
     socket.on("disconnect", onDisconnect);
 
     socket.on("room-joined", (roomState: RoomState) => {
-      setTimers(roomState.timers);
+      setTimers(deduplicateTimers(roomState.timers));
     });
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
-      setTimers(roomState.timers);
+      setTimers(deduplicateTimers(roomState.timers));
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
-      setTimers((prev) => [...prev, newTimer]);
+      setTimers((prev) => deduplicateTimers([...prev, newTimer]));
     });
 
     socket.on("timerTick", ({ timerId, remaining }) => {
@@ -82,6 +91,12 @@ const ViewerPage = () => {
             ? { ...t, remaining: t.duration, isRunning: true }
             : t
         )
+      );
+    });
+
+    socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
+      setTimers((prev) =>
+        prev.map((t) => (t.id === timerId ? { ...t, remaining } : t))
       );
     });
 
