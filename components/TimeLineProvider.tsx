@@ -19,6 +19,7 @@ const Timeline: React.FC<TimelineProps> = ({
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [hoverState, setHoverState] = useState(formatTime(currentTime));
 
   useEffect(() => {
     const updateWidth = () => {
@@ -41,6 +42,16 @@ const Timeline: React.FC<TimelineProps> = ({
   const timeToPosition = (time: number) => (time / duration) * width;
 
   const positionToTime = (pos: number) => (pos / width) * duration;
+
+  const handleMouseHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragging) return;
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    let newPos = e.clientX - rect.left;
+    newPos = Math.max(0, Math.min(newPos, rect.width));
+    const newTime = duration - positionToTime(newPos); // Right to left
+    setHoverState(formatTime(Math.round(newTime)));
+  };
 
   const handleMouseDown = () => {
     setDragging(true);
@@ -80,7 +91,17 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [duration, width]);
 
   return (
-    <div className="relative h-16 w-full" ref={trackRef}>
+    <div
+      className="relative h-16 w-full"
+      ref={trackRef}
+      onMouseMove={handleMouseHover}
+      onMouseLeave={() => setHoverState(formatTime(currentTime))}
+    >
+      <div>
+        <span className="text-sm text-gray-600">
+          Hover Timer Show : {hoverState}
+        </span>
+      </div>
       {/* Background track */}
       <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 rounded transform -translate-y-1/2" />
 
