@@ -4,7 +4,6 @@ export type Timer = {
   duration: number;
   isRunning: boolean;
   remaining?: number;
-  markers: number[];
 };
 
 export type RoomState = {

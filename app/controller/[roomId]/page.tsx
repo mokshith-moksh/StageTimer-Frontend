@@ -186,13 +186,13 @@ const Controller = () => {
         ➕ Add Timer
       </button>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4 w-1/2">
         {timers.map((timer) => {
           const formatted = formatTime(timer.remaining ?? timer.duration);
           return (
             <div
               key={timer.id}
-              className="bg-white p-4 rounded shadow-md w-full max-w-sm"
+              className="bg-white p-4 rounded shadow-md w-full"
             >
               <p className="text-lg font-bold">{timer.name}</p>
               <p>Duration: {formatTime(timer.duration)}</p>
@@ -243,13 +243,12 @@ const Controller = () => {
                   ❌ Delete
                 </button>
               </div>
-              <div>
+              <div className="relative mt-10">
                 <Timeline
                   roomId={roomId}
                   timerId={timer.id}
                   duration={timer.duration}
                   currentTime={timer.remaining ?? timer.duration}
-                  markers={timer.markers || []}
                   onTimeChange={(newTime) =>
                     handleTimeChange(timer.id, newTime)
                   }
