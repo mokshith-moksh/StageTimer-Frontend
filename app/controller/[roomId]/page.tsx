@@ -22,6 +22,15 @@ const Controller = () => {
   const [connected, setConnected] = useState(false);
   const [timers, setTimers] = useState<Timer[]>([]);
   const [connectedClients, setConnectedClients] = useState<number | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    color: string;
+    backgroundColor: string;
+  }>({
+    text: "Welcome to My Room!",
+    color: "#000",
+    backgroundColor: "#fff",
+  });
   const params = useParams();
   const roomId = params.roomId as string;
 
@@ -111,6 +120,11 @@ const Controller = () => {
       );
     });
 
+    socket.on("messageUpdated", ({ text, color, background }) => {
+      setMessage({ text, color, backgroundColor: background });
+      console.log(`Message updated: ${text}`);
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -161,8 +175,73 @@ const Controller = () => {
     });
   };
 
+  const handleSetMessage = (
+    text: string,
+    color: string,
+    backgroundColor: string
+  ) => {
+    if (!text || !color || !backgroundColor) {
+      alert("Please provide valid text, color, and background color.");
+      return;
+    }
+    console.log("entered handleSetMessage");
+    socket.emit("setMessage", { roomId, text, color, backgroundColor });
+    setMessage({
+      text: "",
+      color: "",
+      backgroundColor: "",
+    });
+  };
+
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-slate-200 text-black">
+      <div>
+        {message && (
+          <div
+            className="mt-4 p-4 rounded shadow-md"
+            style={{
+              backgroundColor: message.backgroundColor,
+              color: message.color,
+            }}
+          >
+            <p className="text-lg font-bold">{message.text}</p>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col items-center space-y-4 mt-6 w-1/2">
+        <input
+          placeholder="Color"
+          onChange={(e) =>
+            setMessage((prev) => {
+              return { ...prev, color: e.target.value };
+            })
+          }
+        />
+        <input
+          onChange={(e) =>
+            setMessage((prev) => ({ ...prev, backgroundColor: e.target.value }))
+          }
+          placeholder="Background Color"
+        />
+        <input
+          onChange={(e) =>
+            setMessage((prev) => ({ ...prev, text: e.target.value }))
+          }
+          placeholder="Message Text"
+        />
+        <button
+          onClick={() =>
+            handleSetMessage(
+              message.text,
+              message.color,
+              message.backgroundColor
+            )
+          }
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+        >
+          Update
+        </button>
+      </div>
       <p className="text-2xl mb-2 font-semibold">🛠️ Controller View</p>
       <p className="text-lg">
         Room ID: <span className="font-mono">{roomId}</span>

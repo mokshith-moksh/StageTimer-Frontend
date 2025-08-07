@@ -12,6 +12,11 @@ const ViewerPage = () => {
   const params = useParams();
   const roomId = params.roomId as string;
   const router = useRouter();
+  const [message, setMessage] = useState<{
+    text: string;
+    color: string;
+    backgroundColor: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!roomId) return;
@@ -104,6 +109,11 @@ const ViewerPage = () => {
       setTimers((prev) => prev.filter((t) => t.id !== timerId));
     });
 
+    socket.on("messageUpdated", ({ text, color, background }) => {
+      setMessage({ text, color, backgroundColor: background });
+      console.log(`Message updated: ${text}`);
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -127,6 +137,18 @@ const ViewerPage = () => {
       <p className="mt-4">
         Status: {connected ? "✅ Connected" : "❌ Disconnected"}
       </p>
+
+      {message && (
+        <div
+          className="mt-4 p-4 rounded shadow-md"
+          style={{
+            backgroundColor: message.backgroundColor,
+            color: message.color,
+          }}
+        >
+          <p className="text-lg font-bold">{message.text}</p>
+        </div>
+      )}
 
       <div className="mt-6 space-y-4">
         {timers.length === 0 && <p>No timers yet.</p>}
