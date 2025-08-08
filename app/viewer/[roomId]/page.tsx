@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { socket } from "@/socket";
 import { RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ViewerPage = () => {
   const [connected, setConnected] = useState(false);
@@ -17,6 +18,7 @@ const ViewerPage = () => {
     color: string;
     backgroundColor: string;
   } | null>(null);
+  const [flickering, setFlickering] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
@@ -51,6 +53,8 @@ const ViewerPage = () => {
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
       setTimers(deduplicateTimers(roomState.timers));
+      setMessage(roomState.message || null);
+      setFlickering(roomState.flickering ?? false);
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
@@ -79,44 +83,22 @@ const ViewerPage = () => {
       );
     });
 
-    socket.on("timer-reset", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId
-            ? { ...t, remaining: t.duration, isRunning: false }
-            : t
-        )
-      );
-    });
-
-    socket.on("timer-restarted", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId
-            ? { ...t, remaining: t.duration, isRunning: true }
-            : t
-        )
-      );
-    });
-
     socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
       setTimers((prev) =>
         prev.map((t) => (t.id === timerId ? { ...t, remaining } : t))
       );
     });
 
-    socket.on("timer-deleted", ({ timerId }) => {
-      setTimers((prev) => prev.filter((t) => t.id !== timerId));
+    socket.on("messageUpdated", ({ text, color, backgroundColor }) => {
+      setMessage({ text, color, backgroundColor });
     });
 
-    socket.on("messageUpdated", ({ text, color, background }) => {
-      setMessage({ text, color, backgroundColor: background });
-      console.log(`Message updated: ${text}`);
+    socket.on("flickeringToggled", (flickering: boolean) => {
+      setFlickering(flickering);
     });
 
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
-      alert(`Error: ${error.message}`);
       socket.disconnect();
       router.push("/");
     });
@@ -128,64 +110,166 @@ const ViewerPage = () => {
     };
   }, [roomId]);
 
+  const runningTimers = timers.filter((timer) => timer.isRunning);
+
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-slate-100 text-black">
-      <p className="text-2xl mb-2 font-semibold">👁️ Viewer Page</p>
-      <p className="text-lg">
-        Room ID: <span className="font-mono">{roomId}</span>
-      </p>
-      <p className="mt-4">
-        Status: {connected ? "✅ Connected" : "❌ Disconnected"}
-      </p>
-
-      {message && (
-        <div
-          className="mt-4 p-4 rounded shadow-md"
-          style={{
-            backgroundColor: message.backgroundColor,
-            color: message.color,
-          }}
+    <div className="flex flex-col min-h-screen bg-slate-100 text-black p-4 md:p-8">
+      {/* Header Section */}
+      <header className="text-center mb-6">
+        <motion.h1
+          className="text-2xl md:text-3xl font-bold mb-2"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
         >
-          <p className="text-lg font-bold">{message.text}</p>
-        </div>
-      )}
-
-      <div className="mt-6 space-y-4">
-        {timers.length === 0 && <p>No timers yet.</p>}
-        {timers.map((timer) => (
-          <div
-            key={timer.id}
-            className="bg-white p-4 rounded shadow-md w-full max-w-sm"
-          >
-            <p className="text-lg font-bold">{timer.name}</p>
-            <p>Duration: {formatTime(timer.duration)}</p>
-            <p>
-              Remaining:{" "}
-              <span className="font-mono text-xl">
-                {formatTime(timer.remaining ?? timer.duration)}
-              </span>
-            </p>
-            <p>
-              Status:{" "}
-              <span
-                className={
-                  timer.isRunning
-                    ? "text-green-600"
-                    : timer.remaining === 0
-                    ? "text-red-600"
-                    : "text-gray-600"
-                }
-              >
-                {timer.isRunning
-                  ? "Running ⏱️"
-                  : timer.remaining === 0
-                  ? "Ended ❌"
-                  : "Paused ⏸️"}
-              </span>
-            </p>
+          👁️ Live Timer Viewer
+        </motion.h1>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-2 md:gap-4">
+          <p className="text-sm md:text-base">
+            Room:{" "}
+            <span className="font-mono bg-slate-200 px-2 py-1 rounded">
+              {roomId}
+            </span>
+          </p>
+          <div className="flex items-center gap-2 justify-center">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                connected ? "bg-green-500" : "bg-red-500"
+              }`}
+            />
+            <span>{connected ? "Connected" : "Disconnected"}</span>
           </div>
-        ))}
-      </div>
+        </div>
+      </header>
+
+      {/* Message Display */}
+      <AnimatePresence>
+        {message && (
+          <motion.div
+            className="w-full max-w-2xl mx-auto mb-8 rounded-lg shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: message.backgroundColor,
+              color: message.color,
+            }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.p
+              className={`text-xl md:text-2xl font-bold p-4 md:p-6 text-center ${
+                flickering ? "animate-flash" : ""
+              }`}
+            >
+              {message.text}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Timers Section */}
+      <main className="flex-1 w-full max-w-4xl mx-auto">
+        {runningTimers.length === 0 ? (
+          <motion.div
+            className="text-center py-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <p className="text-lg text-gray-600">
+              No active timers currently running
+            </p>
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <AnimatePresence>
+              {runningTimers.map((timer) => (
+                <motion.div
+                  key={timer.id}
+                  className="bg-white rounded-xl shadow-md overflow-hidden"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                  layout
+                >
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-lg font-bold truncate">
+                        {timer.name}
+                      </h3>
+                      <motion.span
+                        className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800"
+                        animate={{
+                          scale: [1, 1.05, 1],
+                          backgroundColor: ["#dcfce7", "#bbf7d0", "#dcfce7"],
+                        }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 2,
+                        }}
+                      >
+                        LIVE
+                      </motion.span>
+                    </div>
+
+                    <motion.div
+                      className="text-4xl font-mono font-bold text-center my-4"
+                      key={timer.remaining}
+                      initial={{ scale: 1.1, color: "#3b82f6" }}
+                      animate={{ scale: 1, color: "#1e40af" }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      {formatTime(timer.remaining ?? timer.duration)}
+                    </motion.div>
+
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <motion.div
+                        className="text-4xl font-mono font-bold text-center my-4"
+                        key={timer.remaining}
+                        initial={{ scale: 1.1, color: "#3b82f6" }}
+                        animate={{ scale: 1, color: "#1e40af" }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        {formatTime(timer.remaining ?? timer.duration)}
+                      </motion.div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <motion.div
+                          className="bg-blue-600 h-2.5 rounded-full"
+                          initial={{ width: "100%" }}
+                          animate={{
+                            width: `${
+                              ((timer.remaining ?? timer.duration) /
+                                timer.duration) *
+                              100
+                            }%`,
+                            backgroundColor: ["#3b82f6", "#1d4ed8", "#3b82f6"],
+                          }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            repeatType: "reverse",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 text-sm text-gray-600">
+                      <p>Duration: {formatTime(timer.duration)}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="text-center text-sm text-gray-500 mt-8 mb-4">
+        <p>Connected to room: {roomId}</p>
+      </footer>
     </div>
   );
 };

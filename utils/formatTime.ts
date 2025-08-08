@@ -9,3 +9,14 @@ export const formatTime = (seconds: number): string => {
     ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}`
     : `${pad(mins)}:${pad(secs)}`;
 };
+
+// Simple complementary color set generator
+export const getComplementaryColors = (color: string): string[] => {
+  const presets: Record<string, string[]> = {
+    "#000000": ["#ffffff", "#f0f0f0", "#cccccc", "#fffae6"],
+    "#ff0000": ["#ffffff", "#ffe6e6", "#ffcccc", "#fff0f0"],
+    "#0000ff": ["#ffffff", "#e6f0ff", "#cce0ff", "#f0f8ff"],
+    "#008000": ["#ffffff", "#e6ffe6", "#ccffcc", "#f0fff0"],
+  };
+  return presets[color] || ["#ffffff", "#f0f0f0", "#cccccc", "#fffae6"];
+};

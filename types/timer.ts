@@ -6,6 +6,12 @@ export type Timer = {
   remaining?: number;
 };
 
+type message = {
+  color: string;
+  backgroundColor: string;
+  text: string;
+};
+
 export type RoomState = {
   roomId: string;
   adminId: string;
@@ -13,4 +19,6 @@ export type RoomState = {
   clientCount: number;
   timers: Timer[];
   currentTimerId: string | null;
+  message: message;
+  flickering: boolean | null;
 };

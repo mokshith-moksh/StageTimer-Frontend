@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.26.0",
+    "motion": "^12.23.12",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dnd": "^16.0.1",
