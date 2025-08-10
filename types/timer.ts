@@ -6,10 +6,12 @@ export type Timer = {
   remaining?: number;
 };
 
-type message = {
-  color: string;
-  backgroundColor: string;
+export type DisplayNames = {
   text: string;
+  styles: {
+    color: string;
+    bold: boolean;
+  };
 };
 
 export type RoomState = {
@@ -19,6 +21,7 @@ export type RoomState = {
   clientCount: number;
   timers: Timer[];
   currentTimerId: string | null;
-  message: message;
+  displayName: DisplayNames;
+  names: DisplayNames[];
   flickering: boolean | null;
 };

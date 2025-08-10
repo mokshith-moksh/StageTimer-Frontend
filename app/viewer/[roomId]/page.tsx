@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { socket } from "@/socket";
-import { RoomState, Timer } from "@/types/timer";
+import { DisplayNames, RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -13,11 +13,13 @@ const ViewerPage = () => {
   const params = useParams();
   const roomId = params.roomId as string;
   const router = useRouter();
-  const [message, setMessage] = useState<{
-    text: string;
-    color: string;
-    backgroundColor: string;
-  } | null>(null);
+  const [showMessage, setShowMessage] = useState<DisplayNames>({
+    text: "",
+    styles: {
+      color: "#000000",
+      bold: false,
+    },
+  });
   const [flickering, setFlickering] = useState(false);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ const ViewerPage = () => {
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
       setTimers(deduplicateTimers(roomState.timers));
-      setMessage(roomState.message || null);
+      setShowMessage(roomState.displayName);
       setFlickering(roomState.flickering ?? false);
     });
 
@@ -89,10 +91,9 @@ const ViewerPage = () => {
       );
     });
 
-    socket.on("messageUpdated", ({ text, color, backgroundColor }) => {
-      setMessage({ text, color, backgroundColor });
+    socket.on("displayNameUpdated", (data) => {
+      setShowMessage(data);
     });
-
     socket.on("flickeringToggled", (flickering: boolean) => {
       setFlickering(flickering);
     });
@@ -141,32 +142,23 @@ const ViewerPage = () => {
           </div>
         </div>
       </header>
-
-      {/* Message Display */}
-      <AnimatePresence>
-        {message && (
-          <motion.div
-            className="w-full max-w-2xl mx-auto mb-8 rounded-lg shadow-lg overflow-hidden"
-            style={{
-              backgroundColor: message.backgroundColor,
-              color: message.color,
-            }}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
+      {showMessage.text && (
+        <motion.div
+          className="text-center mb-6"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <p
+            className={`text-lg font-semibold ${
+              showMessage.styles.bold ? "font-bold" : ""
+            }`}
+            style={{ color: showMessage.styles.color }}
           >
-            <motion.p
-              className={`text-xl md:text-2xl font-bold p-4 md:p-6 text-center ${
-                flickering ? "animate-flash" : ""
-              }`}
-            >
-              {message.text}
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+            {showMessage.text}
+          </p>
+        </motion.div>
+      )}
       {/* Timers Section */}
       <main className="flex-1 w-full max-w-4xl mx-auto">
         {runningTimers.length === 0 ? (

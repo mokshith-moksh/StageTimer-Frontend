@@ -3,9 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
-import { RoomState, Timer } from "@/types/timer";
+import { DisplayNames, RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import Timeline from "@/components/TimeLineProvider";
+import { useCallback } from "react";
+import FlashButton from "@/components/FlashButton";
+import MessageList from "@/components/MessageList";
 
 // Helper: Deduplicate by `id`
 const deduplicateTimers = (timers: Timer[]): Timer[] => {
@@ -18,43 +21,17 @@ const deduplicateTimers = (timers: Timer[]): Timer[] => {
   return Array.from(map.values());
 };
 
-// Color options
-const TEXT_COLORS = [
-  { value: "#000000", label: "Black" },
-  { value: "#FFFFFF", label: "White" },
-  { value: "#FF0000", label: "Red" },
-  { value: "#00FF00", label: "Green" },
-  { value: "#0000FF", label: "Blue" },
-  { value: "#FFFF00", label: "Yellow" },
-];
-
-const BACKGROUND_COLORS = [
-  { value: "#FFFFFF", label: "White" },
-  { value: "#000000", label: "Black" },
-  { value: "#FFC0CB", label: "Pink" },
-  { value: "#90EE90", label: "Light Green" },
-  { value: "#ADD8E6", label: "Light Blue" },
-  { value: "#FFA500", label: "Orange" },
-];
-
 const Controller = () => {
   const [connected, setConnected] = useState(false);
   const [timers, setTimers] = useState<Timer[]>([]);
   const [connectedClients, setConnectedClients] = useState<number | null>(null);
   const [flickering, setFlickering] = useState(false);
-  const [message, setMessage] = useState<{
-    text: string;
-    color: string;
-    backgroundColor: string;
-  }>({
-    text: "Welcome",
-    color: "#000000",
-    backgroundColor: "#FFFFFF",
-  });
-  const [editMessage, setEditMessage] = useState({
+  const [showMessage, setShowMessage] = useState<DisplayNames>({
     text: "",
-    color: "",
-    backgroundColor: "",
+    styles: {
+      color: "#000000",
+      bold: false,
+    },
   });
   const params = useParams();
   const roomId = params.roomId as string;
@@ -80,18 +57,13 @@ const Controller = () => {
     socket.on("room-joined", (roomState: RoomState) => {
       setConnectedClients(roomState.clientCount);
       setTimers(deduplicateTimers(roomState.timers));
-      setMessage(roomState.message);
-      setEditMessage({
-        text: roomState.message.text,
-        color: roomState.message.color,
-        backgroundColor: roomState.message.backgroundColor,
-      });
+      setShowMessage(roomState.displayName);
     });
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
       setConnectedClients(roomState.clientCount);
       setTimers(deduplicateTimers(roomState.timers));
-      setMessage(roomState.message);
+      setShowMessage(roomState.displayName);
       setFlickering(roomState.flickering ?? false);
       console.log(`Room state updated: ${roomState.roomId}`);
       console.log(`Connected clients: ${roomState.clientCount}`);
@@ -153,11 +125,6 @@ const Controller = () => {
       );
     });
 
-    socket.on("messageUpdated", ({ text, color, backgroundColor }) => {
-      setMessage({ text, color, backgroundColor });
-      console.log(`Message updated: ${text}`);
-    });
-
     socket.on("error", (error: { message: string }) => {
       console.error(`❌ Error: ${error.message}`);
       alert(`Error: ${error.message}`);
@@ -208,130 +175,18 @@ const Controller = () => {
     });
   };
 
-  const handleSetMessage = () => {
-    if (!editMessage.text) {
-      alert("Please enter message text");
-      return;
-    }
-    socket.emit("setMessage", {
-      roomId,
-      text: editMessage.text,
-      color: editMessage.color || "#000000",
-      backgroundColor: editMessage.backgroundColor || "#FFFFFF",
-    });
-  };
-
-  const handleFlickerToggle = () => {
+  const handleFlickerToggle = useCallback(() => {
     setFlickering((prev) => {
       const newFlickeringState = !prev;
       socket.emit("toggleFlicker", { roomId, flickering: newFlickeringState });
       return newFlickeringState;
     });
-  };
+  }, [roomId, flickering]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-slate-200 text-black">
-      <div>
-        {message && (
-          <div
-            className="mt-4 p-4 rounded shadow-md"
-            style={{
-              backgroundColor: message.backgroundColor,
-              color: message.color,
-            }}
-          >
-            <p
-              className={`text-lg font-bold ${
-                flickering ? "animate-flash" : ""
-              }`}
-            >
-              {message.text}
-            </p>
-            <div className="flex items-center mt-2">
-              <label className="mr-2">Flicker:</label>
-              <div
-                className={`relative w-10 h-5 bg-gray-300 rounded-full overflow-hidden cursor-pointer`}
-                onClick={handleFlickerToggle}
-              >
-                <span
-                  className={`absolute transition-transform rounded-full w-1/2 h-full ${
-                    flickering ? "right-0 bg-green-600" : "left-0 bg-red-400"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col items-center space-y-4 mt-6 w-1/2">
-        <div className="w-full">
-          <label className="block mb-1">Message Text</label>
-          <input
-            className="w-full p-2 border rounded"
-            onChange={(e) =>
-              setEditMessage((prev) => ({ ...prev, text: e.target.value }))
-            }
-            value={editMessage.text}
-            placeholder="Enter message text"
-          />
-        </div>
-
-        <div className="w-full">
-          <label className="block mb-1">Text Color</label>
-          <div className="flex flex-wrap gap-2">
-            {TEXT_COLORS.map((color) => (
-              <div
-                key={color.value}
-                className={`w-8 h-8 rounded-full cursor-pointer border-2 ${
-                  editMessage.color === color.value
-                    ? "border-blue-500"
-                    : "border-transparent"
-                }`}
-                style={{ backgroundColor: color.value }}
-                onClick={() =>
-                  setEditMessage((prev) => ({
-                    ...prev,
-                    color: color.value,
-                  }))
-                }
-                title={color.label}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="w-full">
-          <label className="block mb-1">Background Color</label>
-          <div className="flex flex-wrap gap-2">
-            {BACKGROUND_COLORS.map((color) => (
-              <div
-                key={color.value}
-                className={`w-8 h-8 rounded-full cursor-pointer border-2 ${
-                  editMessage.backgroundColor === color.value
-                    ? "border-blue-500"
-                    : "border-transparent"
-                }`}
-                style={{ backgroundColor: color.value }}
-                onClick={() =>
-                  setEditMessage((prev) => ({
-                    ...prev,
-                    backgroundColor: color.value,
-                  }))
-                }
-                title={color.label}
-              />
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={handleSetMessage}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition w-full"
-        >
-          Update Message
-        </button>
-      </div>
+      <FlashButton handleFlickerToggle={handleFlickerToggle} />
+      <MessageList roomId={roomId} />
 
       <p className="text-2xl mb-2 font-semibold mt-8">🛠️ Controller View</p>
       <p className="text-lg">
