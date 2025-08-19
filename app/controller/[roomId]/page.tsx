@@ -3,38 +3,35 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
-import { DisplayNames, RoomState, Timer } from "@/types/timer";
+import { DisplayNames, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import Timeline from "@/components/TimeLineProvider";
 import { useCallback } from "react";
 import FlashButton from "@/components/FlashButton";
 import MessageList from "@/components/MessageList";
-
-// Helper: Deduplicate by `id`
-const deduplicateTimers = (timers: Timer[]): Timer[] => {
-  const map = new Map<string, Timer>();
-  timers.forEach((t) => {
-    if (!map.has(t.id)) {
-      map.set(t.id, t);
-    }
-  });
-  return Array.from(map.values());
-};
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  setRoomState,
+  setTimers,
+  addTimer,
+  updateTimer,
+  removeTimer,
+  setClientCount,
+  setDisplayName,
+  setFlickering,
+} from "@/store/roomSlice";
+import { RoomState } from "@/types/timer";
 
 const Controller = () => {
   const [connected, setConnected] = useState(false);
-  const [timers, setTimers] = useState<Timer[]>([]);
-  const [connectedClients, setConnectedClients] = useState<number | null>(null);
-  const [flickering, setFlickering] = useState(false);
-  const [showMessage, setShowMessage] = useState<DisplayNames>({
-    text: "",
-    styles: {
-      color: "#000000",
-      bold: false,
-    },
-  });
   const params = useParams();
   const roomId = params.roomId as string;
+
+  // Redux hooks
+  const dispatch = useAppDispatch();
+  const { timers, clientCount, displayName, flickering } = useAppSelector(
+    (state) => state.room
+  );
 
   useEffect(() => {
     if (!roomId) return;
@@ -54,74 +51,88 @@ const Controller = () => {
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
-    socket.on("room-joined", (roomState: RoomState) => {
-      setConnectedClients(roomState.clientCount);
-      setTimers(deduplicateTimers(roomState.timers));
-      setShowMessage(roomState.displayName);
+    socket.on("room-joined", (roomState: any) => {
+      dispatch(setClientCount(roomState.clientCount));
+      dispatch(setTimers(roomState.timers));
+      dispatch(setDisplayName(roomState.displayName));
     });
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
-      setConnectedClients(roomState.clientCount);
-      setTimers(deduplicateTimers(roomState.timers));
-      setShowMessage(roomState.displayName);
-      setFlickering(roomState.flickering ?? false);
+      dispatch(setRoomState(roomState));
+      dispatch(setClientCount(roomState.clientCount));
+      dispatch(setTimers(roomState.timers));
+      dispatch(setDisplayName(roomState.displayName));
+      dispatch(setFlickering(roomState.flickering ?? false));
       console.log(`Room state updated: ${roomState.roomId}`);
       console.log(`Connected clients: ${roomState.clientCount}`);
     });
 
     socket.on("timer-added", (newTimer: Timer) => {
-      setTimers((prev) => deduplicateTimers([...prev, newTimer]));
+      console.log(newTimer);
+      dispatch(addTimer(newTimer));
     });
 
     socket.on("timerTick", ({ timerId, remaining }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId ? { ...t, remaining, isRunning: remaining > 0 } : t
-        )
+      dispatch(
+        updateTimer({
+          id: timerId,
+          updates: { remaining, isRunning: remaining > 0 },
+        })
       );
     });
 
     socket.on("timerEnded", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId ? { ...t, isRunning: false, remaining: 0 } : t
-        )
+      dispatch(
+        updateTimer({
+          id: timerId,
+          updates: { isRunning: false, remaining: 0 },
+        })
       );
     });
 
     socket.on("timer-paused", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) => (t.id === timerId ? { ...t, isRunning: false } : t))
+      dispatch(
+        updateTimer({
+          id: timerId,
+          updates: { isRunning: false },
+        })
       );
     });
 
     socket.on("timer-reset", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId
-            ? { ...t, remaining: t.duration, isRunning: false }
-            : t
-        )
-      );
+      const timer = timers.find((t) => t.id === timerId);
+      if (timer) {
+        dispatch(
+          updateTimer({
+            id: timerId,
+            updates: { remaining: timer.duration, isRunning: false },
+          })
+        );
+      }
     });
 
     socket.on("timer-restarted", ({ timerId }) => {
-      setTimers((prev) =>
-        prev.map((t) =>
-          t.id === timerId
-            ? { ...t, isRunning: true, remaining: t.duration }
-            : t
-        )
-      );
+      const timer = timers.find((t) => t.id === timerId);
+      if (timer) {
+        dispatch(
+          updateTimer({
+            id: timerId,
+            updates: { isRunning: true, remaining: timer.duration },
+          })
+        );
+      }
     });
 
     socket.on("timer-deleted", ({ timerId }) => {
-      setTimers((prev) => prev.filter((t) => t.id !== timerId));
+      dispatch(removeTimer(timerId));
     });
 
     socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
-      setTimers((prev) =>
-        prev.map((t) => (t.id === timerId ? { ...t, remaining } : t))
+      dispatch(
+        updateTimer({
+          id: timerId,
+          updates: { remaining },
+        })
       );
     });
 
@@ -176,12 +187,10 @@ const Controller = () => {
   };
 
   const handleFlickerToggle = useCallback(() => {
-    setFlickering((prev) => {
-      const newFlickeringState = !prev;
-      socket.emit("toggleFlicker", { roomId, flickering: newFlickeringState });
-      return newFlickeringState;
-    });
-  }, [roomId, flickering]);
+    const newFlickeringState = !flickering;
+    dispatch(setFlickering(newFlickeringState));
+    socket.emit("toggleFlicker", { roomId, flickering: newFlickeringState });
+  }, [roomId, flickering, dispatch]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-slate-200 text-black">
@@ -201,7 +210,7 @@ const Controller = () => {
       </p>
 
       <p className="mt-4 text-green-600 font-semibold">
-        👥 Connected Clients: {connectedClients ?? "loading..."}
+        👥 Connected Clients: {clientCount ?? "loading..."}
       </p>
 
       <button
@@ -212,11 +221,11 @@ const Controller = () => {
       </button>
 
       <div className="mt-6 space-y-4 w-1/2">
-        {timers.map((timer) => {
+        {timers.map((timer, index) => {
           const formatted = formatTime(timer.remaining ?? timer.duration);
           return (
             <div
-              key={timer.id}
+              key={timer.id + index}
               className="bg-white p-4 rounded shadow-md w-full"
             >
               <p className="text-lg font-bold">{timer.name}</p>
