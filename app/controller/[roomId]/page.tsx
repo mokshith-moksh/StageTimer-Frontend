@@ -19,6 +19,7 @@ import {
   setClientCount,
   setDisplayName,
   setFlickering,
+  setNames,
 } from "@/store/roomSlice";
 import { RoomState } from "@/types/timer";
 
@@ -58,11 +59,14 @@ const Controller = () => {
     });
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
+      console.log("insdie roomState socket");
       dispatch(setRoomState(roomState));
       dispatch(setClientCount(roomState.clientCount));
       dispatch(setTimers(roomState.timers));
       dispatch(setDisplayName(roomState.displayName));
       dispatch(setFlickering(roomState.flickering ?? false));
+      console.log("roomState.names", roomState.names);
+      dispatch(setNames(roomState.names || []));
       console.log(`Room state updated: ${roomState.roomId}`);
       console.log(`Connected clients: ${roomState.clientCount}`);
     });
@@ -190,6 +194,10 @@ const Controller = () => {
     const newFlickeringState = !flickering;
     dispatch(setFlickering(newFlickeringState));
     socket.emit("toggleFlicker", { roomId, flickering: newFlickeringState });
+    setTimeout(() => {
+      dispatch(setFlickering(false));
+      socket.emit("toggleFlicker", { roomId, flickering: false });
+    }, 5000);
   }, [roomId, flickering, dispatch]);
 
   return (

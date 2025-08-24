@@ -5,7 +5,13 @@ interface FlashButtonProps {
 }
 
 const FlashButton: React.FC<FlashButtonProps> = ({ handleFlickerToggle }) => {
-  return <div>FlashButton</div>;
+  return (
+    <div>
+      <button className="cursor-pointer " onClick={() => handleFlickerToggle()}>
+        ⚡️ Flash
+      </button>
+    </div>
+  );
 };
 
 export default FlashButton;

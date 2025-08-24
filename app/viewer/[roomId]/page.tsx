@@ -152,7 +152,7 @@ const ViewerPage = () => {
           <p
             className={`text-lg font-semibold ${
               showMessage.styles.bold ? "font-bold" : ""
-            }`}
+            } ${flickering ? "animate-flash" : ""}`}
             style={{ color: showMessage.styles.color }}
           >
             {showMessage.text}

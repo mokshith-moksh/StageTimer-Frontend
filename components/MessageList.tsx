@@ -1,11 +1,16 @@
 "use client";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import Message from "./Message";
-import { DisplayNames } from "@/types/timer";
+import { DisplayNames, RoomState } from "@/types/timer";
 import { socket } from "@/socket";
+import { useSelector, useDispatch } from "react-redux";
+import { addName, updateName } from "@/store/roomSlice";
+import { RootState } from "@/store/store";
 
 const MessageList = ({ roomId }: { roomId: string }) => {
-  const [messages, setMessages] = useState<DisplayNames[]>([]);
+  const messages = useSelector((state: RootState) => state.room.names ?? []);
+  console.log("Rendering MessageList with messages:", messages);
+  const dispatch = useDispatch();
 
   const handleDisplayNameChange = useCallback(
     (index: number, updates: Partial<DisplayNames>) => {
@@ -15,43 +20,27 @@ const MessageList = ({ roomId }: { roomId: string }) => {
         "with updates:",
         updates
       );
-      setMessages((prev) => {
-        socket.emit("updateNames", { roomId, index, updates });
-        return prev.map((msg, i) =>
-          i === index ? { ...msg, ...updates } : msg
-        );
-      });
+      socket.emit("updateNames", { roomId, index, updates });
+      dispatch(
+        updateName({
+          index,
+          name: { ...messages[index], ...updates },
+        })
+      );
     },
-    []
+    [dispatch, messages, roomId]
   );
 
   const addMessage = () => {
     console.log("Adding new message");
-    setMessages((prev) => {
-      socket.emit("setNames", {
-        roomId,
-        names: [
-          ...prev,
-          {
-            text: "",
-            styles: {
-              color: "#FFFFFF",
-              bold: false,
-            },
-          },
-        ],
-      });
-      return [
-        ...prev,
-        {
-          text: "",
-          styles: {
-            color: "#FFFFFF",
-            bold: false,
-          },
-        },
-      ];
-    });
+    const defaultState: DisplayNames = {
+      text: "",
+      styles: {
+        color: "#FFFFFF",
+        bold: false,
+      },
+    };
+    dispatch(addName(defaultState));
   };
 
   return (

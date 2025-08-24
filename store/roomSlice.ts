@@ -18,7 +18,7 @@ const initialState: RoomState = {
   timers: [],
   currentTimerId: null,
   displayName: initialDisplayName,
-  names: [],
+  names: [initialDisplayName],
   flickering: null,
 };
 
