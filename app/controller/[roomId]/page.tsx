@@ -22,11 +22,13 @@ import {
   setNames,
 } from "@/store/roomSlice";
 import { RoomState } from "@/types/timer";
+import { useUser } from "@clerk/nextjs";
 
 const Controller = () => {
   const [connected, setConnected] = useState(false);
   const params = useParams();
   const roomId = params.roomId as string;
+  const { isLoaded, isSignedIn, user } = useUser();
 
   // Redux hooks
   const dispatch = useAppDispatch();
@@ -34,12 +36,16 @@ const Controller = () => {
     (state) => state.room
   );
 
+  if (!isLoaded || !isSignedIn) {
+    return <div>Loading.....</div>;
+  }
+
   useEffect(() => {
     if (!roomId) return;
 
     const onConnect = () => {
       setConnected(true);
-      socket.emit("join-room", { roomId, role: "admin" });
+      socket.emit("join-room", { roomId, name: user.fullName, role: "admin" });
       console.log(`✅ Joined room ${roomId} as admin`);
     };
 

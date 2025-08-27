@@ -6,6 +6,7 @@ import { socket } from "@/socket";
 import { DisplayNames, RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "@clerk/nextjs";
 
 const ViewerPage = () => {
   const [connected, setConnected] = useState(false);
@@ -21,7 +22,11 @@ const ViewerPage = () => {
     },
   });
   const [flickering, setFlickering] = useState(false);
+  const { isLoaded, isSignedIn, user } = useUser();
 
+  if (!isLoaded || !isSignedIn) {
+    return <div>Loading.....</div>;
+  }
   useEffect(() => {
     if (!roomId) return;
     const deduplicateTimers = (timers: Timer[]): Timer[] => {
@@ -36,7 +41,11 @@ const ViewerPage = () => {
 
     const onConnect = () => {
       setConnected(true);
-      socket.emit("join-room", { roomId, role: "client" });
+      socket.emit("join-room", {
+        roomId,
+        name: user?.fullName,
+        role: "client",
+      });
       console.log(`✅ Joined room ${roomId} as client`);
     };
 
@@ -109,7 +118,7 @@ const ViewerPage = () => {
       socket.off("disconnect", onDisconnect);
       socket.disconnect();
     };
-  }, [roomId]);
+  }, []);
 
   const runningTimers = timers.filter((timer) => timer.isRunning);
 
