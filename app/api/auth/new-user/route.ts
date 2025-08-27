@@ -15,7 +15,7 @@ export async function GET() {
   }
 
   try {
-    await fetch(`http://localhost:8080/new-user`, {
+    await fetch(`http://localhost:8080/api/users/new-user`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -16,14 +16,17 @@ export default function DashboardPage() {
     try {
       console.log("Calling the create room API...");
 
-      const response = await fetch("http://localhost:8080/create-room", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ adminId: user.id }),
-      });
+      const response = await fetch(
+        "http://localhost:8080/api/room/create-room",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ adminId: user.id }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
