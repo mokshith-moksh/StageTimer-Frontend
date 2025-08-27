@@ -46,8 +46,8 @@ const roomSlice = createSlice({
     setTimers: (state, action: PayloadAction<Timer[]>) => {
       state.timers = action.payload;
     },
-    addTimer: (state, action: PayloadAction<Timer>) => {
-      state.timers.push(action.payload);
+    addTimer: (state, action: PayloadAction<Timer[]>) => {
+      state.timers = action.payload;
     },
     updateTimer: (
       state,

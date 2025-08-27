@@ -71,7 +71,7 @@ const Controller = () => {
       console.log(`Connected clients: ${roomState.clientCount}`);
     });
 
-    socket.on("timer-added", (newTimer: Timer) => {
+    socket.on("timer-added", (newTimer: Timer[]) => {
       console.log(newTimer);
       dispatch(addTimer(newTimer));
     });
