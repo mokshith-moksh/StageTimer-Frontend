@@ -23,7 +23,7 @@ export default function DashboardPage() {
     }
     try {
       const response = await fetch(
-        "http://localhost:8080/api/room/create-room",
+        "http://localhost:8080/api/rooms/create-room",
         {
           method: "POST",
           headers: {
@@ -62,7 +62,7 @@ export default function DashboardPage() {
         setIsLoading(true);
         const token = await getToken();
         const response = await fetch(
-          `http://localhost:8080/api/room/getRooms?adminId=${user.id}`,
+          `http://localhost:8080/api/rooms/getRooms?adminId=${user.id}`,
           {
             method: "GET",
             headers: {

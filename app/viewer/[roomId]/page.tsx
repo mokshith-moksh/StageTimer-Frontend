@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { socket } from "@/socket";
-import { DisplayNames, RoomState, Timer } from "@/types/timer";
+import { DisplayMessage, RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
@@ -14,13 +14,7 @@ const ViewerPage = () => {
   const params = useParams();
   const roomId = params.roomId as string;
   const router = useRouter();
-  const [showMessage, setShowMessage] = useState<DisplayNames>({
-    text: "",
-    styles: {
-      color: "#000000",
-      bold: false,
-    },
-  });
+  const [showMessage, setShowMessage] = useState<DisplayMessage>();
   const [flickering, setFlickering] = useState(false);
   const { isLoaded, isSignedIn, user } = useUser();
 
@@ -61,7 +55,6 @@ const ViewerPage = () => {
 
     socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
       setTimers(deduplicateTimers(roomState.timers));
-      setShowMessage(roomState.displayName);
       setFlickering(roomState.flickering ?? false);
     });
 
@@ -97,8 +90,8 @@ const ViewerPage = () => {
       );
     });
 
-    socket.on("displayNameUpdated", (data) => {
-      setShowMessage(data);
+    socket.on("liveMsgUpdate", ({ message }) => {
+      setShowMessage(message);
     });
     socket.on("flickeringToggled", (flickering: boolean) => {
       setFlickering(flickering);
@@ -148,7 +141,7 @@ const ViewerPage = () => {
           </div>
         </div>
       </header>
-      {showMessage.text && (
+      {showMessage && (
         <motion.div
           className="text-center mb-6"
           initial={{ opacity: 0, y: -20 }}

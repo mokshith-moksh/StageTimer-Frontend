@@ -6,12 +6,19 @@ export type Timer = {
   remaining?: number;
 };
 
-export type DisplayNames = {
+export type DisplayMessage = {
+  id: string;
   text: string;
   styles: {
     color: string;
     bold: boolean;
   };
+  isLive: boolean;
+};
+
+export type connectedClients = {
+  socketId: string;
+  name: string;
 };
 
 export type RoomState = {
@@ -20,8 +27,8 @@ export type RoomState = {
   roomName: string;
   adminOnline: boolean;
   clientCount: number;
+  connectedClients: connectedClients[];
   timers: Timer[];
-  displayName: DisplayNames;
-  names: DisplayNames[];
+  names: DisplayMessage[];
   flickering: boolean | null;
 };

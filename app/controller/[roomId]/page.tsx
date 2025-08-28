@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
-import { Timer } from "@/types/timer";
+import { RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import Timeline from "@/components/TimeLineProvider";
 import { useCallback } from "react";
@@ -28,7 +28,7 @@ const Controller = () => {
 
   // Redux hooks
   const dispatch = useAppDispatch();
-  const { timers, clientCount, displayName, flickering } = useAppSelector(
+  const { timers, clientCount, flickering, connectedClients } = useAppSelector(
     (state) => state.room
   );
 
@@ -43,7 +43,7 @@ const Controller = () => {
 
         // 1️⃣ Join room via backend
         const response = await fetch(
-          `http://localhost:8080/api/room/join-room`,
+          `http://localhost:8080/api/rooms/join-room`,
           {
             method: "POST",
             headers: {
@@ -83,6 +83,9 @@ const Controller = () => {
         socket.on("disconnect", onDisconnect);
 
         // 3️⃣ Timer events
+        socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
+          dispatch(setRoomState(roomState));
+        });
         socket.on("timer-added", (newTimer: Timer[]) => {
           console.log(newTimer);
           dispatch(addTimer(newTimer));
@@ -316,6 +319,12 @@ const Controller = () => {
             </div>
           );
         })}
+      </div>
+
+      <div>
+        {connectedClients.map((ele) => (
+          <div key={ele.socketId}>{ele.name}</div>
+        ))}
       </div>
     </div>
   );

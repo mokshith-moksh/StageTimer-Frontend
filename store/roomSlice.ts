@@ -1,14 +1,6 @@
 // store/roomSlice.ts
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { RoomState, Timer, DisplayNames } from "@/types/timer";
-
-const initialDisplayName: DisplayNames = {
-  text: "",
-  styles: {
-    color: "#000000",
-    bold: false,
-  },
-};
+import { RoomState, Timer, DisplayMessage } from "@/types/timer";
 
 const initialState: RoomState = {
   roomId: "",
@@ -16,9 +8,9 @@ const initialState: RoomState = {
   roomName: "",
   adminOnline: false,
   clientCount: 0,
+  connectedClients: [],
   timers: [],
-  displayName: initialDisplayName,
-  names: [initialDisplayName],
+  names: [],
   flickering: null,
 };
 
@@ -69,30 +61,15 @@ const roomSlice = createSlice({
       );
     },
 
-    // DisplayName actions
-    setDisplayName: (state, action: PayloadAction<DisplayNames>) => {
-      state.displayName = action.payload;
-    },
-    updateDisplayNameText: (state, action: PayloadAction<string>) => {
-      state.displayName.text = action.payload;
-    },
-    updateDisplayNameStyles: (
-      state,
-      action: PayloadAction<DisplayNames["styles"]>
-    ) => {
-      state.displayName.styles = action.payload;
-    },
-
-    // Names array actions
-    setNames: (state, action: PayloadAction<DisplayNames[]>) => {
+    setNames: (state, action: PayloadAction<DisplayMessage[]>) => {
       state.names = action.payload;
     },
-    addName: (state, action: PayloadAction<DisplayNames>) => {
+    addName: (state, action: PayloadAction<DisplayMessage>) => {
       state.names.push(action.payload);
     },
     updateName: (
       state,
-      action: PayloadAction<{ index: number; name: DisplayNames }>
+      action: PayloadAction<{ index: number; name: DisplayMessage }>
     ) => {
       if (state.names[action.payload.index]) {
         state.names[action.payload.index] = action.payload.name;
@@ -122,9 +99,6 @@ export const {
   addTimer,
   updateTimer,
   removeTimer,
-  setDisplayName,
-  updateDisplayNameText,
-  updateDisplayNameStyles,
   setNames,
   addName,
   updateName,
