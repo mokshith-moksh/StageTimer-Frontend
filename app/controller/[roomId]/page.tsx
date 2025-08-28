@@ -1,9 +1,8 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { socket } from "@/socket";
-import { DisplayNames, Timer } from "@/types/timer";
+import { Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import Timeline from "@/components/TimeLineProvider";
 import { useCallback } from "react";
@@ -12,23 +11,20 @@ import MessageList from "@/components/MessageList";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   setRoomState,
-  setTimers,
   addTimer,
   updateTimer,
   removeTimer,
-  setClientCount,
-  setDisplayName,
   setFlickering,
-  setNames,
 } from "@/store/roomSlice";
-import { RoomState } from "@/types/timer";
 import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 
 const Controller = () => {
   const [connected, setConnected] = useState(false);
   const params = useParams();
   const roomId = params.roomId as string;
   const { isLoaded, isSignedIn, user } = useUser();
+  const { getToken } = useAuth();
 
   // Redux hooks
   const dispatch = useAppDispatch();
@@ -36,128 +32,143 @@ const Controller = () => {
     (state) => state.room
   );
 
-  if (!isLoaded || !isSignedIn) {
-    return <div>Loading.....</div>;
-  }
-
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !user) return;
 
-    const onConnect = () => {
-      setConnected(true);
-      socket.emit("join-room", { roomId, name: user.fullName, role: "admin" });
-      console.log(`✅ Joined room ${roomId} as admin`);
+    let isMounted = true; // to prevent state updates if component unmounts
+
+    const setupRoom = async () => {
+      try {
+        const token = await getToken();
+
+        // 1️⃣ Join room via backend
+        const response = await fetch(
+          `http://localhost:8080/api/room/join-room`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ roomId, adminId: user.id }),
+          }
+        );
+
+        if (!response.ok) throw new Error("Failed to join room");
+
+        const data = await response.json();
+        const roomState = data.roomState;
+        dispatch(setRoomState(roomState));
+
+        if (!isMounted) return;
+
+        // 2️⃣ Connect to WebSocket after room is ready
+        const onConnect = () => {
+          setConnected(true);
+          socket.emit("join-room-socket", {
+            roomId,
+            name: user.fullName,
+            role: "admin",
+          });
+          console.log(`✅ Joined room ${roomId} as admin`);
+        };
+
+        const onDisconnect = () => {
+          setConnected(false);
+          console.log(`❌ Disconnected from room ${roomId}`);
+        };
+
+        socket.connect();
+        socket.on("connect", onConnect);
+        socket.on("disconnect", onDisconnect);
+
+        // 3️⃣ Timer events
+        socket.on("timer-added", (newTimer: Timer[]) => {
+          console.log(newTimer);
+          dispatch(addTimer(newTimer));
+        });
+
+        socket.on("timerTick", ({ timerId, remaining }) => {
+          dispatch(
+            updateTimer({
+              id: timerId,
+              updates: { remaining, isRunning: remaining > 0 },
+            })
+          );
+        });
+
+        socket.on("timerEnded", ({ timerId }) => {
+          dispatch(
+            updateTimer({
+              id: timerId,
+              updates: { isRunning: false, remaining: 0 },
+            })
+          );
+        });
+
+        socket.on("timer-paused", ({ timerId }) => {
+          dispatch(updateTimer({ id: timerId, updates: { isRunning: false } }));
+        });
+
+        socket.on("timer-reset", ({ timerId }) => {
+          const timer = timers.find((t) => t.id === timerId);
+          if (timer) {
+            dispatch(
+              updateTimer({
+                id: timerId,
+                updates: { remaining: timer.duration, isRunning: false },
+              })
+            );
+          }
+        });
+
+        socket.on("timer-restarted", ({ timerId }) => {
+          const timer = timers.find((t) => t.id === timerId);
+          if (timer) {
+            dispatch(
+              updateTimer({
+                id: timerId,
+                updates: { isRunning: true, remaining: timer.duration },
+              })
+            );
+          }
+        });
+
+        socket.on("timer-deleted", ({ timerId }) => {
+          dispatch(removeTimer(timerId));
+        });
+
+        socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
+          dispatch(updateTimer({ id: timerId, updates: { remaining } }));
+        });
+
+        socket.on("error", (error: { message: string }) => {
+          console.error(`❌ Error: ${error.message}`);
+          alert(`Error: ${error.message}`);
+        });
+      } catch (error) {
+        console.warn("Error while joining the room:", error);
+      }
     };
 
-    const onDisconnect = () => {
-      setConnected(false);
-      console.log(`❌ Disconnected from room ${roomId}`);
-    };
-
-    socket.connect();
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-
-    socket.on("room-joined", (roomState: any) => {
-      dispatch(setClientCount(roomState.clientCount));
-      dispatch(setTimers(roomState.timers));
-      dispatch(setDisplayName(roomState.displayName));
-    });
-
-    socket.on("roomState", ({ roomState }: { roomState: RoomState }) => {
-      console.log("insdie roomState socket");
-      dispatch(setRoomState(roomState));
-      dispatch(setClientCount(roomState.clientCount));
-      dispatch(setTimers(roomState.timers));
-      dispatch(setDisplayName(roomState.displayName));
-      dispatch(setFlickering(roomState.flickering ?? false));
-      console.log("roomState.names", roomState.names);
-      dispatch(setNames(roomState.names || []));
-      console.log(`Room state updated: ${roomState.roomId}`);
-      console.log(`Connected clients: ${roomState.clientCount}`);
-    });
-
-    socket.on("timer-added", (newTimer: Timer[]) => {
-      console.log(newTimer);
-      dispatch(addTimer(newTimer));
-    });
-
-    socket.on("timerTick", ({ timerId, remaining }) => {
-      dispatch(
-        updateTimer({
-          id: timerId,
-          updates: { remaining, isRunning: remaining > 0 },
-        })
-      );
-    });
-
-    socket.on("timerEnded", ({ timerId }) => {
-      dispatch(
-        updateTimer({
-          id: timerId,
-          updates: { isRunning: false, remaining: 0 },
-        })
-      );
-    });
-
-    socket.on("timer-paused", ({ timerId }) => {
-      dispatch(
-        updateTimer({
-          id: timerId,
-          updates: { isRunning: false },
-        })
-      );
-    });
-
-    socket.on("timer-reset", ({ timerId }) => {
-      const timer = timers.find((t) => t.id === timerId);
-      if (timer) {
-        dispatch(
-          updateTimer({
-            id: timerId,
-            updates: { remaining: timer.duration, isRunning: false },
-          })
-        );
-      }
-    });
-
-    socket.on("timer-restarted", ({ timerId }) => {
-      const timer = timers.find((t) => t.id === timerId);
-      if (timer) {
-        dispatch(
-          updateTimer({
-            id: timerId,
-            updates: { isRunning: true, remaining: timer.duration },
-          })
-        );
-      }
-    });
-
-    socket.on("timer-deleted", ({ timerId }) => {
-      dispatch(removeTimer(timerId));
-    });
-
-    socket.on("timerTimeAdjusted", ({ timerId, remaining }) => {
-      dispatch(
-        updateTimer({
-          id: timerId,
-          updates: { remaining },
-        })
-      );
-    });
-
-    socket.on("error", (error: { message: string }) => {
-      console.error(`❌ Error: ${error.message}`);
-      alert(`Error: ${error.message}`);
-    });
+    setupRoom();
 
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("timer-time-updated");
+      isMounted = false;
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("timer-added");
+      socket.off("timerTick");
+      socket.off("timerEnded");
+      socket.off("timer-paused");
+      socket.off("timer-reset");
+      socket.off("timer-restarted");
+      socket.off("timer-deleted");
+      socket.off("timerTimeAdjusted");
+      socket.off("error");
       socket.disconnect();
     };
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   // === Button Handlers ===
   const handleAddTimer = () => {

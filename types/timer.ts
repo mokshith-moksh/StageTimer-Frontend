@@ -17,10 +17,10 @@ export type DisplayNames = {
 export type RoomState = {
   roomId: string;
   adminId: string;
+  roomName: string;
   adminOnline: boolean;
   clientCount: number;
   timers: Timer[];
-  currentTimerId: string | null;
   displayName: DisplayNames;
   names: DisplayNames[];
   flickering: boolean | null;

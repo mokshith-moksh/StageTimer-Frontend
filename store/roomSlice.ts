@@ -13,10 +13,10 @@ const initialDisplayName: DisplayNames = {
 const initialState: RoomState = {
   roomId: "",
   adminId: "",
+  roomName: "",
   adminOnline: false,
   clientCount: 0,
   timers: [],
-  currentTimerId: null,
   displayName: initialDisplayName,
   names: [initialDisplayName],
   flickering: null,
@@ -67,12 +67,6 @@ const roomSlice = createSlice({
       state.timers = state.timers.filter(
         (timer) => timer.id !== action.payload
       );
-      if (state.currentTimerId === action.payload) {
-        state.currentTimerId = null;
-      }
-    },
-    setCurrentTimerId: (state, action: PayloadAction<string | null>) => {
-      state.currentTimerId = action.payload;
     },
 
     // DisplayName actions
@@ -128,7 +122,6 @@ export const {
   addTimer,
   updateTimer,
   removeTimer,
-  setCurrentTimerId,
   setDisplayName,
   updateDisplayNameText,
   updateDisplayNameStyles,

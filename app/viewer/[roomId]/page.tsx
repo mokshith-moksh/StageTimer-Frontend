@@ -24,9 +24,6 @@ const ViewerPage = () => {
   const [flickering, setFlickering] = useState(false);
   const { isLoaded, isSignedIn, user } = useUser();
 
-  if (!isLoaded || !isSignedIn) {
-    return <div>Loading.....</div>;
-  }
   useEffect(() => {
     if (!roomId) return;
     const deduplicateTimers = (timers: Timer[]): Timer[] => {
@@ -41,7 +38,7 @@ const ViewerPage = () => {
 
     const onConnect = () => {
       setConnected(true);
-      socket.emit("join-room", {
+      socket.emit("join-room-socket", {
         roomId,
         name: user?.fullName,
         role: "client",
@@ -118,7 +115,7 @@ const ViewerPage = () => {
       socket.off("disconnect", onDisconnect);
       socket.disconnect();
     };
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   const runningTimers = timers.filter((timer) => timer.isRunning);
 
