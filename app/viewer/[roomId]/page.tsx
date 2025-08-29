@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { socket } from "@/socket";
-import { DisplayMessage, RoomState, Timer } from "@/types/timer";
+import { RoomState, Timer } from "@/types/timer";
 import { formatTime } from "@/utils/formatTime";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
+import { Messages } from "@/components/MessageList";
 
 const ViewerPage = () => {
   const [connected, setConnected] = useState(false);
@@ -14,7 +15,7 @@ const ViewerPage = () => {
   const params = useParams();
   const roomId = params.roomId as string;
   const router = useRouter();
-  const [showMessage, setShowMessage] = useState<DisplayMessage>();
+  const [showMessage, setShowMessage] = useState<Messages[]>([]);
   const [flickering, setFlickering] = useState(false);
   const { isLoaded, isSignedIn, user } = useUser();
 
@@ -90,9 +91,19 @@ const ViewerPage = () => {
       );
     });
 
-    socket.on("liveMsgUpdate", ({ message }) => {
-      setShowMessage(message);
-    });
+    socket.on(
+      "activeMessageUpdated",
+      ({
+        activeMessageId,
+        messages,
+      }: {
+        activeMessageId: string;
+        messages: Messages[];
+      }) => {
+        const msg = messages.filter((msg) => msg.id == activeMessageId);
+        setShowMessage(msg);
+      }
+    );
     socket.on("flickeringToggled", (flickering: boolean) => {
       setFlickering(flickering);
     });
@@ -141,23 +152,26 @@ const ViewerPage = () => {
           </div>
         </div>
       </header>
-      {showMessage && (
-        <motion.div
-          className="text-center mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <p
-            className={`text-lg font-semibold ${
-              showMessage.styles.bold ? "font-bold" : ""
-            } ${flickering ? "animate-flash" : ""}`}
-            style={{ color: showMessage.styles.color }}
-          >
-            {showMessage.text}
-          </p>
-        </motion.div>
-      )}
+      {showMessage &&
+        showMessage.map((ele: Messages) => (
+          <div>
+            <motion.div
+              className="text-center mb-6"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <p
+                className={`text-lg font-semibold ${
+                  ele.styles.bold ? "font-bold" : ""
+                } ${flickering ? "animate-flash" : ""}`}
+                style={{ color: ele.styles.color }}
+              >
+                {ele.text}
+              </p>
+            </motion.div>
+          </div>
+        ))}
       {/* Timers Section */}
       <main className="flex-1 w-full max-w-4xl mx-auto">
         {runningTimers.length === 0 ? (

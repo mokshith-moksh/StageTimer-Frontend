@@ -1,6 +1,6 @@
 // store/roomSlice.ts
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { RoomState, Timer, DisplayMessage } from "@/types/timer";
+import { RoomState, Timer, Messages } from "@/types/timer";
 
 const initialState: RoomState = {
   roomId: "",
@@ -10,7 +10,8 @@ const initialState: RoomState = {
   clientCount: 0,
   connectedClients: [],
   timers: [],
-  names: [],
+  messages: [],
+  activeMessage: null,
   flickering: null,
 };
 
@@ -61,22 +62,22 @@ const roomSlice = createSlice({
       );
     },
 
-    setNames: (state, action: PayloadAction<DisplayMessage[]>) => {
-      state.names = action.payload;
+    setNames: (state, action: PayloadAction<Messages[]>) => {
+      state.messages = action.payload;
     },
-    addName: (state, action: PayloadAction<DisplayMessage>) => {
-      state.names.push(action.payload);
+    addName: (state, action: PayloadAction<Messages>) => {
+      state.messages.push(action.payload);
     },
     updateName: (
       state,
-      action: PayloadAction<{ index: number; name: DisplayMessage }>
+      action: PayloadAction<{ index: number; name: Messages }>
     ) => {
-      if (state.names[action.payload.index]) {
-        state.names[action.payload.index] = action.payload.name;
+      if (state.messages[action.payload.index]) {
+        state.messages[action.payload.index] = action.payload.name;
       }
     },
     removeName: (state, action: PayloadAction<number>) => {
-      state.names.splice(action.payload, 1);
+      state.messages.splice(action.payload, 1);
     },
 
     // Flickering action

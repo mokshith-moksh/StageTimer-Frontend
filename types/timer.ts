@@ -6,7 +6,7 @@ export type Timer = {
   remaining?: number;
 };
 
-export type DisplayMessage = {
+export type Messages = {
   id: string;
   text: string;
   styles: {
@@ -29,6 +29,7 @@ export type RoomState = {
   clientCount: number;
   connectedClients: connectedClients[];
   timers: Timer[];
-  names: DisplayMessage[];
+  messages: Messages[];
+  activeMessage: string | null;
   flickering: boolean | null;
 };
