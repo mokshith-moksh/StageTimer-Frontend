@@ -188,9 +188,9 @@ const ViewerPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <AnimatePresence>
-              {runningTimers.map((timer) => (
+              {runningTimers.map((timer, index) => (
                 <motion.div
-                  key={timer.id}
+                  key={index}
                   className="bg-white rounded-xl shadow-md overflow-hidden"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}

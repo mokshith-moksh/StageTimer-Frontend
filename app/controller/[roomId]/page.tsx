@@ -322,8 +322,8 @@ const Controller = () => {
       </div>
 
       <div>
-        {connectedClients.map((ele) => (
-          <div key={ele.socketId}>{ele.name}</div>
+        {connectedClients.map((ele, index) => (
+          <div key={index}>{ele.name}</div>
         ))}
       </div>
     </div>
