@@ -24,6 +24,7 @@ export type connectedClients = {
 export type RoomState = {
   roomId: string;
   adminId: string;
+  adminSocketId: string | null;
   roomName: string;
   adminOnline: boolean;
   clientCount: number;
@@ -32,4 +33,5 @@ export type RoomState = {
   messages: Messages[];
   activeMessage: string | null;
   flickering: boolean | null;
+  loading: boolean;
 };
