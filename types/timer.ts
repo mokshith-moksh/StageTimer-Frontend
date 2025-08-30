@@ -13,7 +13,7 @@ export type Messages = {
     color: string;
     bold: boolean;
   };
-  isLive: boolean;
+  active?: boolean;
 };
 
 export type connectedClients = {

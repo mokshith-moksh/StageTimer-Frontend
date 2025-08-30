@@ -41,9 +41,20 @@ const roomSlice = createSlice({
       }
     },
 
+    updateMsg: (state, action: PayloadAction<{ id: string; msg: string }>) => {
+      const index = state.messages.findIndex(
+        (msg) => msg.id === action.payload.id
+      );
+      state.messages[index] = {
+        ...state.messages[index],
+        text: action.payload.msg,
+      };
+    },
+
     resetRoom: () => initialState,
   },
 });
 
-export const { setRoomState, updateTimer, resetRoom } = roomSlice.actions;
+export const { setRoomState, updateTimer, resetRoom, updateMsg } =
+  roomSlice.actions;
 export default roomSlice.reducer;
